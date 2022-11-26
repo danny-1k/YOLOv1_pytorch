@@ -32,6 +32,7 @@ class GoogLeNetLikeNet(nn.Module):
     def create_classifier(self):
 
         layers = nn.Sequential(
+            nn.Dropout(.5),
             nn.Linear(1024, 1000)
         )
         
@@ -192,6 +193,72 @@ class DetectorNet(nn.Module):
         return layers
 
 
+class TinyNet(nn.Module):
+    def __init__(self, imagenet=False, use_batch_norm=False, S=7, B=2, C=20):
+        super().__init__()
+        """Tiny version of the original YOLO detector network with only 9 
+            convolutional layers (as oppsed to the 24 used in the bigger model)
+        """
+
+        self.features = self.create_conv_layers(use_batch_norm=use_batch_norm)
+
+        if imagenet:
+            self.classifier = self.create_imagenet_classifier()
+
+        else:
+            self.prediction_output_size = S * S * (B*5 + C)
+            self.classifier = self.create_classifier()
+
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.shape[0], -1)
+        x = self.classifier(x)
+
+        return x
+
+    
+    def create_classifier(self):
+        layers = nn.Sequential(
+            nn.Dropout(.5),
+            nn.Linear(256*7*7, self.prediction_output_size)
+        )
+        
+        return layers
+
+    
+    def create_imagenet_classifier(self):
+        layers = nn.Sequential(
+            nn.Dropout(.5),
+            nn.Linear(256*3*3, 1000)
+        )
+        
+        return layers
+
+
+    def create_conv_layers(self, use_batch_norm):
+        layers = []
+
+        def create_block(in_channels, out_channels, downsample=True):
+            layers.append(nn.Conv2d(in_channels=in_channels, out_channels=out_channels, stride=1, kernel_size=3, padding=1))
+            if use_batch_norm:
+                layers.append(nn.BatchNorm2d(16))
+            layers.append(nn.LeakyReLU(0.1))
+            if downsample:
+                layers.append(nn.MaxPool2d(2,2))
+
+
+        create_block(3, 16)
+        [create_block(16 * 2**(i-1), 16 * 2**i) for i in range(1, 6)]
+        create_block(16 * 2**5, 2 * 16 * 2**5, downsample=False)
+        create_block(2 * 16 * 2**5, 16 * 2**4, downsample=False)
+
+
+        layers = nn.Sequential(*layers)
+
+        return layers
+
+
 if __name__ == '__main__':
     import unittest
     
@@ -200,6 +267,9 @@ if __name__ == '__main__':
 
     detectornet = DetectorNet(feature_extractor=GoogLeNetLikeNet(is_feature_extractor=True))
     darknet = GoogLeNetLikeNet(is_feature_extractor=False)
+
+    tinynet_imagenet = TinyNet(imagenet=True)
+    tinynet_yolo = TinyNet()
 
     class DetectorNetTest(unittest.TestCase):
         def test_output(self):
@@ -212,6 +282,16 @@ if __name__ == '__main__':
         def test_output(self):
             pred = darknet(darknet_input)
             self.assertEqual(pred.shape, (1, 1000))
+
+
+    class TinyNetTest(unittest.TestCase):
+        def test_imagenet_output(self):
+            pred = tinynet_imagenet(darknet_input)
+            self.assertEqual(pred.shape, (1, 1000))
+
+        def test_detector_output(self):
+            pred = tinynet_yolo(detectornet_input)
+            self.assertEqual(pred.shape, (1, 7*7 * (2*5 + 20)))
 
 
     unittest.main()
