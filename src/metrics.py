@@ -1,3 +1,6 @@
+import torch
+
+
 def union(intersection:float, bx1:int, by1:int, tx1:int, ty1:int, bx2:int, by2:int, tx2:int, ty2:int) -> float:
     """Calculate union given the bottom left and top right co-ordinates of two bounding boxes
 
@@ -25,6 +28,24 @@ def union(intersection:float, bx1:int, by1:int, tx1:int, ty1:int, bx2:int, by2:i
 
     return u
 
+
+def union_t(intersection:torch.Tensor, bb1:torch.Tensor, bb2:torch.Tensor):
+    """Calculate Union for pytorch Tensors
+
+    Args:
+        intersection (torch.Tensor): Intersection
+        bbx1 (torch.Tensor): first bounding box (N X 4) (bx, by, tx, ty)
+        bbx2 (torch.Tensor): second bounding box (N X 4) (bx, by, tx, ty)
+    """
+
+    area1 = abs(bb1[:, 0] - bb1[:, 2]) * abs(bb1[:, 1] - bb1[:, 3])
+    area2 = abs(bb2[:, 0] - bb2[:, 2]) * abs(bb2[:, 1] - bb2[:, 3])
+
+    u = (area1 + area2) - intersection
+
+    return u
+
+
 def intersection(bx1:int, by1:int, tx1:int, ty1:int, bx2:int, by2:int, tx2:int, ty2:int) -> float:
     """Calculate intersection given the bottom left and top right co-ordinates of two bounding boxes
 
@@ -47,6 +68,26 @@ def intersection(bx1:int, by1:int, tx1:int, ty1:int, bx2:int, by2:int, tx2:int, 
 
     itx = min(tx1, tx2)
     ity = max(ty1, ty2)
+
+
+    area = abs(ibx-itx) * abs(iby-ity)
+
+    return (ibx, iby, itx, ity), area
+
+
+def intersection_t(bb1:torch.Tensor, bb2:torch.Tensor):
+    """Calculate Intersection for pytorch Tensors
+
+    Args:
+        bbx1 (torch.Tensor): first bounding box (N X 4) (bx, by, tx, ty)
+        bbx2 (torch.Tensor): second bounding box (N X 4) (bx, by, tx, ty)
+    """
+
+    ibx = torch.max(bb1[:, 0], bb2[:, 0])
+    iby = torch.min(bb1[:, 1], bb2[:, 1])
+
+    itx = torch.min(bb1[:, 2], bb2[:, 2])
+    ity = torch.max(bb1[:, 3], bb2[:, 3])
 
 
     area = abs(ibx-itx) * abs(iby-ity)
@@ -103,6 +144,15 @@ def iou(bbox1: tuple, bbox2:tuple) -> float:
     return IoU
 
 
+def iou_t(bb1:torch.Tensor, bb2:torch.Tensor):
+    _, i = intersection_t(bb1, bb2)
+    u = union_t(i, bb1, bb2)
+
+    IoU = i/u
+
+    return IoU
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import numpy as np
@@ -117,7 +167,15 @@ if __name__ == '__main__':
 
     IoU = iou(bbox1, bbox2)
 
-    print(IoU)
+    bbox1_t = torch.Tensor([list(bbox1), list(bbox1)])
+    bbox2_t = torch.Tensor([list(bbox2), list(bbox2)])
+
+    IoU_t = iou_t(bbox1_t, bbox2_t)
+
+    assert IoU_t[0].item() == IoU_t[1].item()
+    assert IoU_t[0].item() - IoU < 1e-5
+
+    print(IoU, IoU_t)
 
     img = np.zeros((10, 10, 3))
 
@@ -156,4 +214,5 @@ if __name__ == '__main__':
     plt.imshow(img)
     plt.show()
 
-   
+
+    
