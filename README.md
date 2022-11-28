@@ -14,6 +14,8 @@ So we've got an image, we split the image up into an **S** X **S** grid (**S** =
 
 We make each box to be responsible for predicting **B** bounding boxes (**B** = 2), **B** Class scores (**C** = 20 in PascalVoc dataset) and a confidence level indicating how sure it is.
 
+The network outputs an S × S × (B ∗ 5 + C) Tensor which in this case is a Tensor of size 7x7x30 = 1470 (did it up the top of my head 🤥)
+
 ### But why is the number of bounding boxes per cell > 1??
 
 It's been shown that making **B** > 1 (2 or 3) can increase the flexibility of the model and make the model learn "specialized" bounding box predictors for each cell in the grid.
