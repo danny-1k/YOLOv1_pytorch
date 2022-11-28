@@ -9,6 +9,7 @@ YOLO is just a normal convnet that predicts the bounding boxes, class scores and
 The clever part of the algorithm is how the detection and localiztion problem is represented.
 
 So we've got an image, we split the image up into an **S** X **S** grid (**S** = 7)
+
 ![S x S grid on image](imgs/sxs_grid.png)
 
 We make each box to be responsible for predicting **B** bounding boxes (**B** = 2), **B** Class scores (**C** = 20 in PascalVoc dataset) and a confidence level indicating how sure it is.
