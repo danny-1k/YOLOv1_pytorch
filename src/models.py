@@ -221,7 +221,8 @@ class TinyNet(nn.Module):
     def create_classifier(self):
         layers = nn.Sequential(
             nn.Dropout(.5),
-            nn.Linear(256*7*7, self.prediction_output_size)
+            nn.Linear(256*7*7, self.prediction_output_size),
+            nn.Sigmoid()
         )
         
         return layers
