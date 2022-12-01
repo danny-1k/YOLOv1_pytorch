@@ -10,6 +10,8 @@ from typing import Tuple
 
 import time
 
+import json
+
 #https://github.com/pytorch/examples/tree/master/imagenet
 #https://github.com/wenwei202/pytorch-examples/blob/master/imagenet/main.py
 class AverageMeter:
@@ -196,3 +198,50 @@ def save_checkpoint(state: dict,
 
     if is_best:
         shutil.copy(os.path.join(dir, 'checkpoint.pth.tar'), os.path.join(dir, 'best.pth.tar'))
+
+
+voc_classes = json.load(open('voc_classes.json', 'r'))
+
+def label_from_voc(annotations: list, width: int, height: int, B: int, S:int) -> list:
+
+    y = torch.zeros((S, S, B*5 + 20))
+
+    for annotation in annotations:
+        obj_class = annotation['name']
+        class_index = voc_classes[obj_class]
+        obj_bbox = annotation['bndbox']
+
+        # compute mid x and mid y of bounding box
+        # get which grid the center of the bounding box falls into
+        # compute the center of the bb with respect to the grid
+        # compute the width and height of bounding box wrt to the image
+
+        grid_size_x = (width/S)
+        grid_size_y = (height/S)
+
+
+        xmin = int(obj_bbox['xmin'])
+        xmax = int(obj_bbox['xmax'])
+
+        ymin = int(obj_bbox['ymin'])
+        ymax = int(obj_bbox['ymax'])
+
+        x_center = (xmin + xmax)//2
+        y_center = (ymin + ymax)//2
+
+        S_x = int(x_center//grid_size_x)
+        S_y = int(y_center//grid_size_y)
+
+        y[S_x, S_y, :B*5] = torch.Tensor([
+            (x_center - S_x * grid_size_x)/width, # center x wrt grid
+            (y_center - S_y * grid_size_y)/height, # center y wrt grid
+            (xmax - xmin)/width, # normalized bb width
+            (ymax - ymin)/height, # normalized bb height
+            1.
+        ]).repeat(B)
+
+        # class scores
+        y[S_x, S_y, (B*5) + class_index] = 1
+
+
+    return y
