@@ -1,0 +1,23 @@
+{
+    "person":0,
+    "bird":1,
+    "cat":2,
+    "cow":3,
+    "dog":4,
+    "horse":5,
+    "sheep":6,
+    "aeroplane":7,
+    "bicycle":8,
+    "boat":9,
+    "bus":10,
+    "car":11,
+    "motorbike":12,
+    "train":13,
+    "bottle":14,
+    "chair":15,
+    "dining table":16,
+    "potted":17,
+    "plant":18,
+    "sofa":19,
+    "tv/monitor":20
+}
