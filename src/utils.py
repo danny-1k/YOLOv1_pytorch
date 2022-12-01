@@ -245,3 +245,20 @@ def label_from_voc(annotations: list, width: int, height: int, B: int, S:int) ->
 
 
     return y
+
+
+def convert_to_coords(t):
+    #(centerx, centery, w, h) -> (x1, y1, x2, y2)
+    # t of shape (N, 4) 
+    # we're still using bottom, top format
+
+    x1 = t[:, 0] - t[:, 2] / 2
+    y1 = t[:, 1] + t[:, 3] / 2
+
+    x2 = t[:, 0] + t[:, 2] / 2
+    y2 = t[:, 1] - t[:, 3] / 2
+
+
+    coords = torch.stack([x1, y1, x2, y2], dim=1)
+
+    return coords
