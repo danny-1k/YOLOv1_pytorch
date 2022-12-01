@@ -204,6 +204,9 @@ voc_classes = json.load(open('voc_classes.json', 'r'))
 
 def label_from_voc(annotations: list, width: int, height: int, B: int, S:int) -> list:
 
+    # first B*4 entries are bb coordinates
+    # last B entries are confidence scores
+
     y = torch.zeros((S, S, B*5 + 20))
 
     for annotation in annotations:
@@ -232,13 +235,14 @@ def label_from_voc(annotations: list, width: int, height: int, B: int, S:int) ->
         S_x = int(x_center//grid_size_x)
         S_y = int(y_center//grid_size_y)
 
-        y[S_x, S_y, :B*5] = torch.Tensor([
+        y[S_x, S_y, :B*4] = torch.Tensor([
             (x_center - S_x * grid_size_x)/width, # center x wrt grid
             (y_center - S_y * grid_size_y)/height, # center y wrt grid
             (xmax - xmin)/width, # normalized bb width
             (ymax - ymin)/height, # normalized bb height
-            1.
         ]).repeat(B)
+
+        y[S_x, S_y, B*4:B + B*4] = torch.ones((B))
 
         # class scores
         y[S_x, S_y, (B*5) + class_index] = 1
@@ -249,16 +253,18 @@ def label_from_voc(annotations: list, width: int, height: int, B: int, S:int) ->
 
 def convert_to_coords(t):
     #(centerx, centery, w, h) -> (x1, y1, x2, y2)
-    # t of shape (N, 4) 
+    # t of shape (N, B*4) 
     # we're still using bottom, top format
 
-    x1 = t[:, 0] - t[:, 2] / 2
-    y1 = t[:, 1] + t[:, 3] / 2
+    t = t.view(t.shape[0], -1, 4)
 
-    x2 = t[:, 0] + t[:, 2] / 2
-    y2 = t[:, 1] - t[:, 3] / 2
+    x1 = t[:, :, 0] - t[:, :, 2] / 2
+    y1 = t[:, :, 1] + t[:, :, 3] / 2
+
+    x2 = t[:, :, 0] + t[:, :, 2] / 2
+    y2 = t[:, :, 1] - t[:, :, 3] / 2
 
 
-    coords = torch.stack([x1, y1, x2, y2], dim=1)
+    coords = torch.stack([x1, y1, x2, y2], dim=2)
 
     return coords
