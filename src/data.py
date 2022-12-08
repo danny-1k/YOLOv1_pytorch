@@ -20,7 +20,7 @@ def get_imagetnet_dataset(train_transform=None, test_transform=None):
 
 
 class PascalVocDataset(Dataset):
-    def __init__(self, train=True, download=False, B=2, S=7) -> None:
+    def __init__(self, train=True, download=False, B=2, S=7, transform=None) -> None:
         super().__init__()
 
         self.B = B
@@ -28,9 +28,15 @@ class PascalVocDataset(Dataset):
         # classes are 20 in VOC
 
         if train:
-            self.transform = detection_transforms['train']
+            if not transform:
+                self.transform = detection_transforms['train']
+            else:
+                self.transform = transform
         else:
-            self.transform = detection_transforms['test']
+            if not transform:
+                self.transform = detection_transforms['test']
+            else:
+                self.transform = transform
 
         self.dataset = VOCDetection(
             root='../data/pascalvoc', year='2007',
@@ -60,6 +66,6 @@ class PascalVocDataset(Dataset):
 if __name__ == '__main__':
     ptrain = PascalVocDataset(train=True)
     ptest = PascalVocDataset(train=False)
-    # x, y = ptest[0]
+    x, y = ptest[0]
 
-    # print(y.shape)
+    print(y.shape)
