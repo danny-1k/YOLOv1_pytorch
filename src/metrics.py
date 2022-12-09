@@ -144,13 +144,18 @@ def iou(bbox1: tuple, bbox2:tuple) -> float:
     return IoU
 
 
-def iou_t(bb1:torch.Tensor, bb2:torch.Tensor):
+def iou_t(bb1:torch.Tensor, bb2:torch.Tensor) -> torch.Tensor:
     _, i = intersection_t(bb1, bb2)
     u = union_t(i, bb1, bb2)
 
     IoU = i/u
 
     return IoU
+
+
+def MeanAveragePrecision(bb1:torch.Tensor, bb2:torch.Tensor) -> float:
+    pass
+
 
 
 if __name__ == '__main__':
