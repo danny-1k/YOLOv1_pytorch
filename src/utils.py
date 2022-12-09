@@ -83,9 +83,8 @@ def train(train_loader: DataLoader,
         # measure data loading time
         data_time.update(time.time() - end)
 
-        # Create non_blocking tensors for distributed training
-        input = input.cuda(non_blocking=True)
-        target = input.cuda(non_blocking=True)
+        input = input.cpu()
+        target = target.cpu()
 
         # compute output
 
@@ -98,6 +97,8 @@ def train(train_loader: DataLoader,
 
         # Call step of optimizer to update model params
         optimizer.step()
+
+        print(loss.item())
 
         if i % print_freq == 0:
             # Every log_freq iterations, check the loss, accuracy and speed.
@@ -154,8 +155,8 @@ def validate(
     with torch.no_grad():
         end = time.time()
         for i, (input, target) in enumerate(val_loader):
-            input = input.cuda(non_blocking=True)
-            target = target.cuda(non_blocking=True)
+            input = input.cpu(non_blocking=True)
+            target = target.cpu(non_blocking=True)
 
             # compute output
             output = model(input)
