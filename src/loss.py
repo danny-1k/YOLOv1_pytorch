@@ -48,10 +48,10 @@ class DetectionLoss(nn.Module):
         box_targets = box_exists * truth[..., 0:4] # All the bounding boxes in truth are the same
 
         # Take the sqrt of the height's and width's so we can reduce the effect of MSE on smaller values
-        box_predictions[..., 2:4] = torch.sign(
-            box_predictions[..., 2:4].clone() * torch.sqrt(
-            box_predictions[..., 2:4].abs() + 1e-6
-        ))
+        box_predictions[..., 2:4] = torch.sign(box_predictions[..., 2:4]) *\
+            torch.sqrt(
+                box_predictions[..., 2:4].abs() + 1e-6
+            )
 
         box_targets[..., 2:4] = torch.sqrt(
             box_targets[..., 2:4]
@@ -124,4 +124,4 @@ if __name__ == '__main__':
 
     loss = DetectionLoss()
 
-    loss(p, y)
+    print(loss(p, y))
