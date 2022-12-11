@@ -51,7 +51,7 @@ if __name__ == '__main__':
     ])
 
     
-    train = PascalVocDataset(train=False, download=False, transform=train_transform)#PascalVocDataset(train=True, download=True)
+    train = PascalVocDataset(train=True, download=False, transform=train_transform)#PascalVocDataset(train=True, download=True)
     test = PascalVocDataset(train=False, download=False, transform=test_transform)
 
 
