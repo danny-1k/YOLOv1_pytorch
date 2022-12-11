@@ -49,3 +49,9 @@ PS: I lied when I said the we split the images into grids...We don't. But you ca
 Theres a tiny version of the model with only 9 conv layers🤯
 
 # Okay, I wanna Run it
+## I wanna train from scratch
+- Run download script ``./scripts/download_data.sh``
+- Train model ``python train_tiny_yolo.py --lr [Starting learning rate] -b [batch_size] -p [print_freq] ``
+- I just want to checkout a pretrained model
+  - **Wait, you lazy ass...**
+
