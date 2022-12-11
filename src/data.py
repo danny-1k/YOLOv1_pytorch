@@ -64,8 +64,8 @@ class PascalVocDataset(Dataset):
 
 
 if __name__ == '__main__':
-    ptrain = PascalVocDataset(train=True)
-    ptest = PascalVocDataset(train=False)
+    ptrain = PascalVocDataset(train=True, download=True)
+    ptest = PascalVocDataset(train=False, download=True)
     x, y = ptest[0]
 
     print(y.shape)
