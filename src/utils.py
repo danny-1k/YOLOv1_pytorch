@@ -12,6 +12,8 @@ import time
 
 import json
 
+from metrics import iou_t
+
 #https://github.com/pytorch/examples/tree/master/imagenet
 #https://github.com/wenwei202/pytorch-examples/blob/master/imagenet/main.py
 class AverageMeter:
@@ -53,6 +55,19 @@ def accuracy(output: torch.Tensor,
         return res
 
 
+def IOU_metric(output, target, S=7, B=2, C=20):
+    with torch.no_grad():
+        output = output.view(-1, S, S, 5*B + C)
+        target = target.view(-1, S, S, 5*B + C)
+
+        ious = iou_t(
+            convert_to_coords(output[..., :B*4].contiguous()).view(-1, 4),
+            convert_to_coords(target[..., :B*4].contiguous()).view(-1, 4),
+        ).view(-1, S, S, B).max(dim=-1)[0]
+
+        return ious.mean()    
+
+
 def to_python_float(t: torch.Tensor):
     if hasattr(t, 'item'):
         return t.item()
@@ -65,14 +80,23 @@ def train(train_loader: DataLoader,
           criterion: nn.Module,
           optimizer: Optimizer,
           epoch: int,
-          print_freq: int = 100
+          print_freq: int = 1,
+          metric='accuracy'
          ):
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
+
+    metrics = {}
+
+    for metric in list(set(metric.split('/'))):
+        if metric == 'accuracy':
+            metrics['top1']= AverageMeter()
+            metrics['top5']= AverageMeter()
+
+        elif metric == 'iou':
+            metrics['iou']= AverageMeter()
 
     #switch to train mode
     model.train()
@@ -83,13 +107,13 @@ def train(train_loader: DataLoader,
         # measure data loading time
         data_time.update(time.time() - end)
 
-        # Create non_blocking tensors for distributed training
-        input = input.cuda(non_blocking=True)
-        target = input.cuda(non_blocking=True)
+        input = input.cuda()
+        target = input.cuda()
 
         # compute output
 
         logits = model(input)
+        # print(logits.shape, target.shape)
         loss = criterion(logits, target)
 
         # compute gradients in a backward pass
@@ -99,36 +123,43 @@ def train(train_loader: DataLoader,
         # Call step of optimizer to update model params
         optimizer.step()
 
-        if i % print_freq == 0:
+        if i % print_freq == 0 or i == len(train_loader)-1:
             # Every log_freq iterations, check the loss, accuracy and speed.
             # For best performance, it doesn't make sense to print these metrics every
             # iteration, since they incur an allreduce and some host<-> device syncs.
 
             # Measure accuracy
-            prec1, prec5 = accuracy(logits.data, target.data, topk=(1,5))
-
-
-            # to_python_float incurs a host<->device sync
             batch_size = input[0].size(0)
             losses.update(to_python_float(loss), batch_size)
-            top1.update(to_python_float(prec1), batch_size)
-            top5.update(to_python_float(prec5), batch_size)
+            
+            if metrics.get('accuracy'):
+                prec1, prec5 = accuracy(logits.data, target.data, topk=(1,5))
+                # to_python_float incurs a host<->device sync
+                metrics['top1'].update(to_python_float(prec1), batch_size)
+                metrics['top5'].update(to_python_float(prec5), batch_size)
+
+            if metrics.get('iou'):
+                iou = IOU_metric(logits.data, target.data)
+                metrics['iou'].update(to_python_float(iou), batch_size)
+                
+
 
             batch_time.update((time.time() - end) / print_freq)
             end = time.time()
 
             print(
-                f"Epoch: [{epoch}][{i}/{len(train_loader)}]\t"
-                f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
-                f"Speed {batch_size / batch_time.val:.3f} ({batch_size / batch_time.avg:.3f})\t"
-                f"Loss {losses.val:.10f} ({losses.avg:.4f})\t"
-                f"Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t"
-                f"Prec@5 {top5.val:.3f} ({top5.avg:3f})"
+                f"Epoch: [{epoch+1}][{i+1}/{len(train_loader)}]\t",
+                f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t",
+                f"Speed {batch_size / batch_time.val:.3f} ({batch_size / batch_time.avg:.3f})\t",
+                f"Loss {losses.val:.10f} ({losses.avg:.4f})\t",
+                f"Prec@1 {metrics['top1'].val:.3f} ({metrics['top1'].avg:.3f})\t" if metrics.get('top1') else  "",
+                f"Prec@5 {metrics['top5'].val:.3f} ({metrics['top5'].avg:3f})\t" if metrics.get('top5') else "",
+                f"IOU {metrics['iou'].val:.3f} ({metrics['iou'].avg:.3f})\t" if metrics.get('iou') else  "",
             )
 
 def adjust_learning_rate(initial_lr: float,
                          optimzer: Optimizer,
-                         epoch: int
+                         epoch: int,
                         ):
     """Sets the learning rate to the initial LR decayed by 10 ever 30 epochs"""
     lr = initial_lr * (.1 ** (epoch // 30))
@@ -140,13 +171,22 @@ def validate(
             val_loader: DataLoader,
             model: nn.Module,
             criterion: nn.Module, 
-            print_freq: int = 100
+            print_freq: int = 100,
+            metric='iou'
             ):
+
+    metrics = {}
+
+    for metric in list(set(metric.split('/'))):
+        if metric == 'accuracy':
+            metrics['top1']= AverageMeter()
+            metrics['top5']= AverageMeter()
+
+        elif metric == 'iou':
+            metrics['iou']= AverageMeter()
 
     batch_time = AverageMeter()
     losses = AverageMeter()
-    top1 = AverageMeter()
-    top5 = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
@@ -154,36 +194,47 @@ def validate(
     with torch.no_grad():
         end = time.time()
         for i, (input, target) in enumerate(val_loader):
-            input = input.cuda(non_blocking=True)
-            target = target.cuda(non_blocking=True)
+            input = input.cuda()
+            target = target.cuda()
 
             # compute output
             output = model(input)
             loss = criterion(output, target)
 
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(output, target, topk=(1, 5))
-            losses.update(loss.item(), input.size(0))
-            top1.update(prec1[0], input.size(0))
-            top5.update(prec5[0], input.size(0))
+            batch_size = input[0].size(0)
+            losses.update(to_python_float(loss), batch_size)
+            
+            if metrics.get('accuracy'):
+                prec1, prec5 = accuracy(output.data, target.data, topk=(1,5))
+                # to_python_float incurs a host<->device sync
+                metrics['top1'].update(to_python_float(prec1), batch_size)
+                metrics['top5'].update(to_python_float(prec5), batch_size)
+
+            if metrics.get('iou'):
+                iou = IOU_metric(output.data, target.data)
+                metrics['iou'].update(to_python_float(iou), batch_size)
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % print_freq == 0:
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                      'Prec@5 {top5.val:.3f} ({top5.avg:.3f})'.format(
-                       i, len(val_loader), batch_time=batch_time, loss=losses,
-                       top1=top1, top5=top5))
+            if i % print_freq == 0 or i == len(val_loader)-1:
+                print(
+                    f'Test: [{i+1}/{len(val_loader)}]\t',
+                    f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t",
+                    f"Speed {batch_size / batch_time.val:.3f} ({batch_size / batch_time.avg:.3f})\t",
+                    f"Loss {losses.val:.10f} ({losses.avg:.4f})\t",
+                    f"Prec@1 {metrics['top1'].val:.3f} ({metrics['top1'].avg:.3f})\t" if metrics.get('top1') else  "",
+                    f"Prec@5 {metrics['top5'].val:.3f} ({metrics['top5'].avg:3f})\t" if metrics.get('top5') else "",
+                    f"IOU {metrics['iou'].val:.3f} ({metrics['iou'].avg:.3f})\t" if metrics.get('iou') else  "",
+                )
 
-        print(' * Prec@1 {top1.avg:.3f} Prec@5 {top5.avg:.3f}'
-              .format(top1=top1, top5=top5))
 
-    return top1.avg
+    if metrics.get('accuracy'):
+        return metrics['top1']
+    if metrics.get('iou'):
+        return metrics['iou'] # so we can save the highest iou
 
 
 def save_checkpoint(state: dict,
