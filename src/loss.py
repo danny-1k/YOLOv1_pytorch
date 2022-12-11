@@ -34,6 +34,8 @@ class DetectionLoss(nn.Module):
 
         iou_max, best_box = torch.max(ious, dim=-1)
 
+        best_box = best_box.unsqueeze(-1)
+
         box_exists = truth[..., (4*self.B) + 1].unsqueeze(-1)
 
 
@@ -41,17 +43,19 @@ class DetectionLoss(nn.Module):
 
 
         box_predictions = box_exists * (
-            best_box.unsqueeze(-1) * pred[..., 4:8]
-            + (1 - best_box).unsqueeze(-1) * pred[..., 0:4]
+            best_box * pred[..., 4:8]
+            + (1 - best_box) * pred[..., 0:4]
         )
 
         box_targets = box_exists * truth[..., 0:4] # All the bounding boxes in truth are the same
 
         # Take the sqrt of the height's and width's so we can reduce the effect of MSE on smaller values
-        box_predictions[..., 2:4] = torch.sign(
-            box_predictions[..., 2:4].clone() * torch.sqrt(
-            box_predictions[..., 2:4].abs() + 1e-6
-        ))
+        sqrt_dims = torch.sign(box_predictions[..., 2:4]) *\
+            torch.sqrt(
+                torch.abs(box_predictions[..., 2:4].abs() + 1e-6)
+            )
+
+        box_predictions[..., 2:4] = sqrt_dims.clone().data#torch.rand_like(sqrt_dims)
 
         box_targets[..., 2:4] = torch.sqrt(
             box_targets[..., 2:4]
@@ -66,8 +70,8 @@ class DetectionLoss(nn.Module):
         # -----object loss------
 
         pred_confidence = box_exists * (
-            best_box.unsqueeze(-1) * pred[..., 8:9]
-            + (1 - best_box).unsqueeze(-1) * pred[..., 9:10]
+            best_box * pred[..., 8:9]
+            + (1 - best_box) * pred[..., 9:10]
         )
 
         target_confidence = box_exists * (
@@ -115,13 +119,19 @@ class DetectionLoss(nn.Module):
 
 
 if __name__ == '__main__':
-    p = torch.ones((1, 7, 7, 30))
-    y = torch.ones((1, 7, 7, 30))/2
+    torch.autograd.set_detect_anomaly(True)
+    p = torch.ones((1, 7, 7, 30), requires_grad=True)
+    y = torch.ones((1, 7, 7, 30), requires_grad=True)/2
 
-    p[:, :, :, -20:] = torch.Tensor([2]*19 + [1])
-    y[:, :, :, -20:] = torch.Tensor([0]*19 + [1])
+    # p[:, :, :, -20:] = torch.Tensor([2]*19 + [1])
+    # y[:, :, :, -20:] = torch.Tensor([0]*19 + [1])
 
 
     loss = DetectionLoss()
 
-    loss(p, y)
+    print(p.dtype, 'prediction')
+    print(y.dtype, 'truth')
+
+    l = loss(p, y)
+
+    l.backward()
