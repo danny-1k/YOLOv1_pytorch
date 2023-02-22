@@ -10,6 +10,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', default=5e-4, type=float, help='weight_decay (Default: 5e-4)')
     parser.add_argument('--resume', default=None, type=str, help='Resume training from checkpoint')
     parser.add_argument('--workers', default=4, type=int, help='Number of Data loading workers (Default: 4)')
+    parser.add_argument('--run_name', default="001", help="Run name (for tensorboard). Must be unique")
 
 
 
@@ -23,6 +24,7 @@ if __name__ == '__main__':
     from torch.optim import Adam
     from models import TinyNet
     from torch.utils.data import DataLoader
+    from torch.utils.tensorboard import SummaryWriter
     from torchvision.transforms import transforms
 
     from data import PascalVocDataset
@@ -34,7 +36,15 @@ if __name__ == '__main__':
 
     from loss import DetectionLoss
 
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
+
+    if os.path.exists(f"../runs/tiny/{args.run_name}"):
+        print(f"Run name {args.run_name} already exists. Use a different run name or delete the run.")
+        sys.exit(1)
+    else:
+        os.makedirs(f"../runs/tiny/{args.run_name}")
+
+    writer = SummaryWriter(f"../runs/tiny/{args.run_name}")
 
     train_transform = transforms.Compose([
         transforms.Resize((224*2, 224*2)),
@@ -98,6 +108,7 @@ if __name__ == '__main__':
             epoch=epoch,
             print_freq=args.print_freq,
             metric='iou',
+            writer=writer
         )
 
         iou = validate_epoch(
@@ -105,7 +116,8 @@ if __name__ == '__main__':
             model=net,
             criterion=lossfn,
             print_freq=args.print_freq,
-            metric='iou'
+            metric='iou',
+            writer=writer
         )
 
 

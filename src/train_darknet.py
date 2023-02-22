@@ -10,6 +10,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', default=5e-4, type=float, help='weight_decay (Default: 5e-4)')
     parser.add_argument('--resume', default=None, type=str, help='Resume training from checkpoint')
     parser.add_argument('--workers', default=4, type=int, help='Number of Data loading workers (Default: 4)')
+    parser.add_argument('--run_name', default="001", help="Run name (for tensorboard). Must be unique")
 
 
 
@@ -23,6 +24,7 @@ if __name__ == '__main__':
     from torch.optim import Adam
     from models import GoogLeNetLikeNet
     from torch.utils.data import DataLoader
+    from torch.utils.tensorboard import SummaryWriter
     from torchvision.transforms import transforms
 
     from data import get_imagetnet_dataset
@@ -31,6 +33,14 @@ if __name__ == '__main__':
     from utils import validate as validate_epoch
     from utils import adjust_learning_rate
     from utils import save_checkpoint
+
+    if os.path.exists(f"../runs/darknet/{args.run_name}"):
+        print(f"Run name {args.run_name} already exists. Use a different run name or delete the run.")
+        sys.exit(1)
+    else:
+        os.makedirs(f"../runs/darknet/{args.run_name}")
+
+    writer = SummaryWriter(f"../runs/darknet/{args.run_name}")
 
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(224),
@@ -91,7 +101,8 @@ if __name__ == '__main__':
             criterion=lossfn,
             optimizer=optimizer,
             epoch=epoch,
-            print_freq=args.print_freq
+            print_freq=args.print_freq,
+            writer=writer
         )
 
         prec1 = validate_epoch(
@@ -99,6 +110,7 @@ if __name__ == '__main__':
             model=darknet,
             criterion=lossfn,
             print_freq=args.print_freq
+            writer=writer
         )
 
 
