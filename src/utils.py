@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from typing import Tuple
 
@@ -77,11 +78,12 @@ def to_python_float(t: torch.Tensor):
 
 def train(train_loader: DataLoader,
           model: nn.Module,
+          writer: SummaryWriter,
           criterion: nn.Module,
           optimizer: Optimizer,
           epoch: int,
           print_freq: int = 1,
-          metric='accuracy'
+          metric='accuracy',
          ):
 
     batch_time = AverageMeter()
@@ -147,6 +149,19 @@ def train(train_loader: DataLoader,
             batch_time.update((time.time() - end) / print_freq)
             end = time.time()
 
+            writer.add_scalar("Loss/train", losses.avg)
+
+            if metrics.get("iou"):
+                writer.add_scalar("IOU/train", metrics["iou"].avg)
+
+            if metrics.get("top1"):
+                writer.add_scalar("TOP1/train", metrics["top1"].avg)
+
+            if metrics.get("top5"):
+                writer.add_scalar("TOP5/train", metrics["top5"].avg)
+                
+
+
             print(
                 f"Epoch: [{epoch+1}][{i+1}/{len(train_loader)}]\t",
                 f"Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t",
@@ -171,8 +186,9 @@ def validate(
             val_loader: DataLoader,
             model: nn.Module,
             criterion: nn.Module, 
+            writer: SummaryWriter,
             print_freq: int = 100,
-            metric='iou'
+            metric='iou',
             ):
 
     metrics = {}
@@ -218,6 +234,17 @@ def validate(
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
+
+            writer.add_scalar("Loss/test", losses.avg)
+
+            if metrics.get("iou"):
+                writer.add_scalar("IOU/test", metrics["iou"].avg)
+
+            if metrics.get("top1"):
+                writer.add_scalar("TOP1/test", metrics["top1"].avg)
+
+            if metrics.get("top5"):
+                writer.add_scalar("TOP5/test", metrics["top5"].avg)
 
             if i % print_freq == 0 or i == len(val_loader)-1:
                 print(
