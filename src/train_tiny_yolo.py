@@ -65,10 +65,10 @@ if __name__ == '__main__':
     test = PascalVocDataset(train=False, download=False, transform=test_transform)
 
 
-    train = DataLoader(train, batch_size=args.batch_size, shuffle=True)#num_workers=args.workers, pin_memory=True)
-    test = DataLoader(test, batch_size=args.batch_size, shuffle=False)#num_workers=args.workers, pin_memory=True)
+    train = DataLoader(train, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
+    test = DataLoader(test, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
 
-    net = TinyNet(use_batch_norm=args.use_batch_norm) #(is_feature_extractor=False, use_batch_norm=args.use_batch_norm).to('cuda') #dont even bother on cpu
+    net = TinyNet(use_batch_norm=args.use_batch_norm).to('cuda') #dont even bother on cpu
 
     lossfn = DetectionLoss()
 
